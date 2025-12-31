@@ -36,62 +36,62 @@
       container.appendChild(this._canvas);
       this._shadow.appendChild(container);
 
+      
+
       this._chart = null;
+    }
+    
+    fireRenderComplete() {
+      console.log("Render Complete - Event Fired");
+
+      this.dispatchEvent(new CustomEvent("customWidgetRenderComplete", {
+        bubbles: true,
+        composed: true
+      }));
     }
 
     _updateSourceFromBinding(binding) {
       this._SourceData = this._SourceData || {
-        DATE: [],
-        PRODUCT_CODE: [],
-        PRODUCT_CATEGORY: [],
-        CLEARING_PRICE: [],
-        SPREAD_CAPTURE: []
+        Products: [],
+        Date: [],
+        ProductCategory: [],
+        ClearingPrice: [],
+        SpreadCapture: []
       };
 
       if (binding && Array.isArray(binding.data) && binding.data.length > 0) {
         const rows = binding.data;
 
         this._SourceData = {
-          DATE: [],
-          PRODUCT_CODE: [],
-          PRODUCT_CATEGORY: [],
-          CLEARING_PRICE: [],
-          SPREAD_CAPTURE: []
+          Products: [],
+          Date: [],
+          ProductCategory: [],
+          ClearingPrice: [],
+          SpreadCapture: []
         };
 
         rows.forEach(r => {
-          // Map SAC binding positions to live model fields:
-          // DATE              -> dimensions_0.label
-          // PRODUCT_CODE      -> dimensions_1.label
-          // PRODUCT_CATEGORY  -> dimensions_2.label
-          // CLEARING_PRICE    -> measures_0
-          // SPREAD_CAPTURE    -> measures_1
-          const DATE             = r["dimensions_0"]?.label ?? "";
-          const PRODUCT_CODE     = r["dimensions_1"]?.label ?? "";
-          const PRODUCT_CATEGORY = r["dimensions_2"]?.label ?? "";
+          const date    = r["dimensions_0"]?.label ?? "";
+          const product = r["dimensions_1"]?.label ?? "";
+          const cat     = r["Product Category"] ?? r["dimensions_2"]?.label ?? "";
 
-          const CLEARING_PRICE_raw_m = r["measures_0"];
-          const SPREAD_CAPTURE_raw_m = r["measures_1"];
+          const m0 = r["measures_0"];
+          const m1 = r["measures_1"];
 
-          const clearingRaw = CLEARING_PRICE_raw_m
-            ? Number(CLEARING_PRICE_raw_m.raw ?? CLEARING_PRICE_raw_m.label ?? CLEARING_PRICE_raw_m)
-            : null;
-          const CLEARING_PRICE = clearingRaw != null ? clearingRaw : null;
+          const clearingRaw = m0 ? Number(m0.raw ?? m0.label ?? m0) : null;
+          const clearing    = clearingRaw != null ? clearingRaw : null;
 
-          const spreadRaw = SPREAD_CAPTURE_raw_m
-            ? Number(SPREAD_CAPTURE_raw_m.raw ?? SPREAD_CAPTURE_raw_m.label ?? SPREAD_CAPTURE_raw_m)
-            : null;
-          const SPREAD_CAPTURE = spreadRaw != null ? spreadRaw * 100 : null;
+          const spreadRaw   = m1 ? Number(m1.raw ?? m1.label ?? m1) : null;
+          const spread      = spreadRaw != null ? spreadRaw * 100 : null;
 
-          this._SourceData.DATE.push(String(DATE));
-          this._SourceData.PRODUCT_CODE.push(String(PRODUCT_CODE));
-          this._SourceData.PRODUCT_CATEGORY.push(String(PRODUCT_CATEGORY));
-          this._SourceData.CLEARING_PRICE.push(CLEARING_PRICE);
-          this._SourceData.SPREAD_CAPTURE.push(SPREAD_CAPTURE);
+          this._SourceData.Products.push(String(product));
+          this._SourceData.Date.push(String(date));
+          this._SourceData.ProductCategory.push(String(cat));
+          this._SourceData.ClearingPrice.push(clearing);
+          this._SourceData.SpreadCapture.push(spread);
         });
       }
-
-      if (this._SourceData && Array.isArray(this._SourceData.DATE)) {
+      if (this._SourceData && Array.isArray(this._SourceData.Date)) {
         this._buildMetaFromSource();
       }
     }
@@ -99,46 +99,30 @@
     _buildMetaFromSource() {
       const src = this._SourceData;
 
-      const uniqueDates = Array.from(new Set(src.DATE));
-      const uniqueProducts = Array.from(new Set(src.PRODUCT_CODE));
+      const uniqueDates = Array.from(new Set(src.Date));
+      const uniqueProducts = Array.from(new Set(src.Products));
 
       this._LabelData = { UniqueDate: uniqueDates };
       this._ProductListData = this._buildProductList(uniqueProducts);
     }
 
     _buildProductList(uniqueProducts) {
-      const DAY_AHEAD_NAME = "Day-Ahead";   // exact text in PRODUCT_CODE
+      const DAY_AHEAD_NAME = "Day Ahead";
       const LONG_TERM_NAME = "Long Term";
 
-      const OTHER_COLORS = [ 
-          "#F9CCCC", "#46b1e1", "#ff8b8b", "#215f9a",
-          "#611bacff", "#CAFCF8", "#E8EED8", "#FAF5CC", 
-          "#c19af8ff", "#F8CECE", "#D5CDF9" ];
-
-          
       const barColor = [];
       const lineColor = [];
-          
-      let otherColorIndex = 0;
-
 
       uniqueProducts.forEach(p => {
         if (p === DAY_AHEAD_NAME) {
-          barColor.push("#93C47D");   // Day-Ahead bar (green)
-          lineColor.push("#7F7F7F");  // Day-Ahead line (gray)
+          barColor.push("#93C47D");   // Day Ahead bar (green)
+          lineColor.push("#7F7F7F");  // Day Ahead line (gray)
         } else if (p === LONG_TERM_NAME) {
-          // barColor.push("#F9CCCC");   // Long Term bar (light pink)
-          const c = OTHER_COLORS[otherColorIndex % OTHER_COLORS.length];
-          otherColorIndex += 1;
-          barColor.push(c);
-          lineColor.push(c);
-          // lineColor.push("#000000");  // Long Term line (black)
+          barColor.push("#F9CCCC");   // Long Term bar (light pink)
+          lineColor.push("#000000");  // Long Term line (black)
         } else {
-      // Other products: also use the list (or keep your own rule here)
-          const c = OTHER_COLORS[otherColorIndex % OTHER_COLORS.length];
-          otherColorIndex += 1;
-          barColor.push(c);
-          lineColor.push(c);
+          barColor.push("#93C47D");
+          lineColor.push("#7F7F7F");
         }
       });
 
@@ -149,17 +133,16 @@
       };
     }
 
-
     connectedCallback() {
       loadScriptSequential(CDN_CANDIDATES)
         .then(() => loadScriptSequential(DATALABELS_CDNS))
         .then(() => {
           this._SourceData = {
-            DATE: [],
-            PRODUCT_CODE: [],
-            PRODUCT_CATEGORY: [],
-            CLEARING_PRICE: [],
-            SPREAD_CAPTURE: []
+            Products: [],
+            Date: [],
+            ProductCategory: [],
+            ClearingPrice: [],
+            SpreadCapture: []
           };
 
           this._LabelData = { UniqueDate: [] };
@@ -190,7 +173,6 @@
       this._shadow.innerHTML = `<div style="font:14px sans-serif;padding:8px;color:#b00020">${msg}</div>`;
     }
 
-  
     _buildDatasets() {
       const dates = this._LabelData.UniqueDate;
       const src = this._SourceData;
@@ -202,44 +184,30 @@
         const barData = new Array(dates.length).fill(null);
         const lineData = new Array(dates.length).fill(null);
 
-        // const OTHER_COLORS = [ 
-        //   "#F9CCCC", "#46b1e1", "#ff8b8b", "#215f9a",
-        //   "#611bacff", "#CAFCF8", "#E8EED8", "#FAF5CC", 
-        //   "#c19af8ff", "#F8CECE", "#D5CDF9" ];
+        for (let i = 0; i < src.Date.length; i++) {
+          if (src.Products[i] !== prodName) continue;
 
-        // let otherColorIndex  = 0;
-
-        for (let i = 0; i < src.DATE.length; i++) {
-          if (src.PRODUCT_CODE[i] !== prodName) continue;
-
-          const date = src.DATE[i];
+          const date = src.Date[i];
           const pos = dates.indexOf(date);
           if (pos === -1) continue;
 
-          barData[pos]  = src.CLEARING_PRICE[i];
-          lineData[pos] = src.SPREAD_CAPTURE[i];
+          barData[pos]  = src.ClearingPrice[i];
+          lineData[pos] = src.SpreadCapture[i];
         }
 
-        // PRODUCT_CATEGORY == "Day Ahead"
-        // const isDayAhead = prodName === "Day-Ahead";
-
-        // const barBgColor   = plist.BarColour[idx];
-        // const labelBgColor = isDayAhead ? "#93C47D" : "#F9CCCC";
-        // const lineBorderColor = plist.LineColour[idx];
-        // const labelBgColor_1  = isDayAhead ? "#7F7F7F" : "#000000";
-
-        const barBgColor      = plist.BarColour[idx];
+        const isLongTerm = prodName === "Day Ahead";
+        
+        // Use colors from the ProductListData which has correct mapping
+        const barBgColor = plist.BarColour[idx];
+        const labelBgColor = isLongTerm ? "#93C47D" : "#F9CCCC";
         const lineBorderColor = plist.LineColour[idx];
+        const labelBgColor_1 = isLongTerm ? "#7F7F7F" : "#000000"
 
-        const labelBgColor   = barBgColor;
-        // if the line is the gray Day-Ahead line, keep gray labels; otherwise black
-        const labelBgColor_1 = lineBorderColor === "#7F7F7F" ? "#7F7F7F" : "#000000";
-
-        // BAR DATASET (CLEARING_PRICE)
+        // BAR DATASET
         datasets.push({
           type: "bar",
           label: prodName + " Clearing Price",
-          display: "auto",
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] != null,
           data: barData,
           backgroundColor: labelBgColor,
           borderColor: barBgColor,
@@ -263,37 +231,41 @@
               weight: "bold",
               size: 11
             },
+            // formatter: (v) => v == null ? "" : "€ " + v.toFixed(2)
             formatter: (v) => {
-              if (v == null || isNaN(v)) return null;
+              if (v == null || isNaN(v)) return null; // prevents label box from rendering
               return "€ " + v.toFixed(2);
             }
+
           }
         });
 
-        // LINE DATASET (SPREAD_CAPTURE %)
+        // LINE DATASET
         datasets.push({
           type: "line",
           label: prodName + " Spread Capture %",
           data: lineData,
-          display: "auto",
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] != null,
           yAxisID: "y1",
           borderColor: labelBgColor_1,
-          backgroundColor: lineBorderColor,
+          backgroundColor: "lineBorderColor",
           tension: 0,
           stepped: false,
           pointRadius: 4,
           pointHoverRadius: 5,
           pointBorderWidth: 2,
-          pointBackgroundColor: "#7F7F7F",
+          pointBackgroundColor: "#7F7F7F", // grey points
           borderWidth: 2,
           order: 0,
           z: 10,
           datalabels: {
             align: "top",
             anchor: "end",
+            // offset: 4,
             offset: (ctx) => {
               const i = ctx.dataIndex;
               const hasBar = barData[i] != null;
+              // if there is a bar at this x, push the line label far above it
               return hasBar ? -20 : 4;
             },
             color: "#ffffff",
@@ -309,7 +281,7 @@
               weight: "bold",
               size: 11
             },
-            formatter: (v) => v == null || isNaN(v) ? "" : v.toFixed(0) + "%"
+            formatter: (v) => v == null ? "" : v.toFixed(0) + "%"
           }
         });
       });
@@ -328,6 +300,14 @@
       this._destroy();
       const ctx = this._canvas.getContext("2d");
 
+      const renderCompletePlugin = {
+      id: "renderComplete",
+      afterRender(chart) {
+        console.log("Chart rendered (plugin)");
+        that.fireRenderComplete(); // ✅ correct call
+        }
+      };
+
       this._chart = new window.Chart(ctx, {
         type: "bar",
         data: { labels, datasets },
@@ -337,7 +317,9 @@
           interaction: { mode: "index", intersect: false },
           animation: false,
           layout: {
-            padding: { top: 35 , right: 0, bottom: 0, left: 0}
+            padding: {
+              top: 40
+            }
           },
           plugins: {
             title: {
@@ -346,7 +328,10 @@
               font: { size: 20, weight: "bold" },
               align: "center",
               color: "#000000",
-              padding: { top:2, bottom: 30}
+              padding: {
+                top: 10,
+                bottom: 30,
+              }
             },
             legend: {
               position: "bottom",
@@ -369,36 +354,52 @@
                 }
               }
             },
-            tooltip: {
-              mode: "index",
-              intersect: false,
-              filter: (ctx) => {
-                const v = ctx.parsed?.y;
-                return v !== null && v !== undefined && !isNaN(v);
-              },
-              callbacks: {
-                label: (ctx) => {
-                  const dsLabel = ctx.dataset.label || "";
-                  const v = ctx.parsed.y;
-                  if (v == null || isNaN(v)) return null;
-                  if (dsLabel.includes("Spread Capture")) {
-                    return dsLabel + ": " + v.toFixed(0) + "%";
+            // tooltip: {
+            //   mode: "index",
+            //   intersect: false,
+            //   callbacks: {
+            //     label: (ctx) => {
+            //       const dsLabel = ctx.dataset.label || "";
+            //       const v = ctx.parsed.y;
+            //       if (dsLabel.includes("Spread Capture")) {
+            //         return dsLabel + ": " + (v != null ? v.toFixed(0) + "%" : "");
+            //       }
+            //       return dsLabel + ": " + (v != null ? "€ " + v.toFixed(2) : "");
+            //     }
+            //   }
+            // },
+              tooltip: {
+                mode: "index",
+                intersect: false,
+                filter: (ctx) => {
+                  const v = ctx.parsed?.y;
+                  return v !== null && v !== undefined && !isNaN(v);
+                },
+                callbacks: {
+                  label: (ctx) => {
+                    const dsLabel = ctx.dataset.label || "";
+                    const v = ctx.parsed.y;
+
+                    if (v == null || isNaN(v)) return null;
+
+                    if (dsLabel.includes("Spread Capture")) {
+                      return dsLabel + ": " + v.toFixed(0) + "%";
+                    }
+                    return dsLabel + ": € " + v.toFixed(2);
                   }
-                  return dsLabel + ": € " + v.toFixed(2);
                 }
-              }
-            },
+              },
+
             datalabels: {
-              display: true
+              display: true,
             }
           },
           scales: {
             y: {
               beginAtZero: true,
-              title: { display: true, text: "" },
+              title: { display: true, text: "Clearing Price (EUR)" },
               ticks: {
-                callback: v => "€ " + Number(v).toFixed(0),
-                padding: 20
+                callback: v => "€ " + Number(v).toFixed(0)
               },
               grid: {
                 drawBorder: false,
@@ -408,7 +409,10 @@
                 borderDash: [],
                 display: true
               },
-              border: { display: false, width: 0 }
+              border: {
+                display: false,
+                width: 0
+              }
             },
             y1: {
               beginAtZero: true,
@@ -419,11 +423,13 @@
                 drawTicks: false
               },
               ticks: {
-                callback: v => v.toFixed(0) + "%",
-                padding: 20
+                callback: v => v.toFixed(0) + "%"
               },
-              title: { display: true, text: "" },
-              border: { display: false, width: 0 }
+              title: { display: true, text: "Spread Capture %" },
+              border: {
+                display: false,
+                width: 0
+              }
             },
             x: {
               grid: {
@@ -433,23 +439,26 @@
                 drawTicks: false,
                 lineWidth: 0
               },
-              border: { display: false, width: 0 },
+              border: {
+                display: false,
+                width: 0
+              },
               ticks: {
                 autoSkip: true,
                 maxRotation: 0,
                 minRotation: 0,
                 display: true,
-                backdropColor: "transparent",
-                color: "#000000",
-                padding: 5
+                backdropColor: 'transparent', // Removes background box behind tick labels
+                color: '#000000', // Ensures tick text is visible
+                padding: 5 // Adds spacing to avoid overlap
               }
             }
           }
         },
-        plugins: [window.ChartDataLabels]
+        plugins: [window.ChartDataLabels,renderCompletePlugin]
       });
     }
   }
-  
+
   customElements.define("perci-combo-chart", PerciComboChart);
 })();
